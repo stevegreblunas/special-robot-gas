@@ -54,7 +54,6 @@ class Showcase extends React.Component {
       });
     }
 
-
     this.wave = async () => {
       try {
         const { ethereum } = window;
