@@ -1,14 +1,15 @@
 import React from 'react';
 import { ethers } from "ethers";
 import { Link } from 'react-router-dom';
-import { Button, Card, Modal, ModalHeader, ModalBody, Spinner } from 'reactstrap'
+import { Button, Card, Modal, ModalHeader, ModalBody, Spinner, ListGroup, ListGroupItem, Badge, CardColumns } from 'reactstrap'
 
 import abi from './utils/WavePortal.json'
 /**
         * Create a letiable here that holds the contract address after you deploy!
         */
-const contractAddress = "0x6312b65B67ff076400B5cC47851695Df0482247c";
+const contractAddress = "0x5E5571618b77CE56C297115340801C3e26dFaEA4";
 
+let loaded = false;
 const contractABI = abi.abi;
 const PUZZLE_DIFFICULTY = 3;
 const PUZZLE_HOVER_TINT = '#009900';
@@ -42,7 +43,8 @@ class Showcase extends React.Component {
       currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
       totalwaves: this.state && this.state.count,
       controlIsLoading: this.state && this.state.controlIsLoading,
-      puzzleImg: _img
+      puzzleImg: _img,
+      leaderboard: []
     }));
 
   }
@@ -76,12 +78,12 @@ class Showcase extends React.Component {
       _currentPiece = null;
       _currentDropPiece = null;
       _stage.drawImage(this.state && this.state.puzzleImg, 0, 0, _puzzleWidth, _puzzleHeight, 0, 0, _puzzleWidth, _puzzleHeight);
-      if(this.state && this.state.isWinner)
-      { 
-      }else
-      {
+      if (this.state && this.state.isWinner) {
+      } else {
         this.createTitle("Click to Start Puzzle");
       }
+
+
       this.buildPieces();
     }
     this.createTitle = (msg) => {
@@ -111,7 +113,11 @@ class Showcase extends React.Component {
           yPos += _pieceHeight;
         }
       }
-      document.onmousedown = this.shufflePuzzle;
+
+      if (this.state && this.state.isWinner) {
+      } else {
+        document.onmousedown = this.shufflePuzzle;
+      }
     }
     this.shufflePuzzle = () => {
       _pieces = this.shuffleArray(_pieces);
@@ -239,7 +245,8 @@ class Showcase extends React.Component {
           totalwaves: this.state && this.state.count,
           controlIsLoading: this.state && this.state.controlIsLoading,
           puzzleImg: this.state && this.state.puzzleImg,
-          isWinner: true
+          isWinner: true,
+          leaderboard: this.state && this.state.leaderboard
         }));
         this.gameOver();
       }
@@ -289,12 +296,39 @@ class Showcase extends React.Component {
 
           let count = await wavePortalContract.getTotalWaves();
           console.log("Retrieved total wave count...", count.toNumber());
-          this.setState(() => ({
-            currentAccount: account,       // update the value of specific key
-            totalwaves: count.toNumber(),
 
-            controlIsLoading: false
-          }));
+          let wavers = await wavePortalContract.getWavers();
+
+          console.log("###############WAV ERS");
+
+          let leaderboard = [];
+
+          wavers.map(async (myValue) => {
+
+            let waveInfo = await wavePortalContract.getWaverInfo(myValue);
+
+            leaderboard.push(
+              {
+                address: myValue,
+                wins: waveInfo.imageUrls.length,
+                imageUrls: waveInfo.imageUrls
+              }
+            );
+
+            console.log(leaderboard);
+
+            this.setState(() => ({
+              currentAccount: account,       // update the value of specific key
+              totalwaves: count.toNumber(),
+
+              controlIsLoading: false,
+              leaderboard: leaderboard
+            }));
+
+
+          });
+
+
 
         } else {
           console.log("No authorized account found")
@@ -357,7 +391,8 @@ class Showcase extends React.Component {
         this.setState(() => ({
           currentAccount: accounts[0],       // update the value of specific key
           totalwaves: count,
-          controlIsLoading: false
+          controlIsLoading: false,
+          leaderboard: this.state && this.state.leaderboard
         }
         ))
       } catch (error) {
@@ -380,8 +415,8 @@ class Showcase extends React.Component {
           this.setState(() => ({
             currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
             totalwaves: count.toNumber(),
-
-            controlIsLoading: true
+            controlIsLoading: true,
+            leaderboard: this.state && this.state.leaderboard
           }));
           /*
           * Execute the actual wave from your smart contract
@@ -398,7 +433,8 @@ class Showcase extends React.Component {
             currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
             totalwaves: count.toNumber(),
 
-            controlIsLoading: false
+            controlIsLoading: false,
+            leaderboard: this.state && this.state.leaderboard
           }));
         } else {
           console.log("Ethereum object doesn't exist!");
@@ -409,13 +445,41 @@ class Showcase extends React.Component {
           currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
           totalwaves: this.state && this.state.totalwaves,
 
-          controlIsLoading: false
+          controlIsLoading: false,
+          leaderboard: this.state && this.state.leaderboard
         }));
       }
     }
 
-    this.checkIfWalletIsConnected();
-    this.GetPuzzle();
+    this.OpenWinModal = (e) => {
+
+      let modalAddress = e.currentTarget.id;
+
+      this.setState(() => ({
+        currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
+        totalwaves: this.state && this.state.totalwaves,
+
+        controlIsLoading: false,
+        leaderboard: this.state && this.state.leaderboard,
+        modalAddress: modalAddress
+      }));
+
+    }
+
+
+    this.CloseWinModal = (e) => {
+
+
+      this.setState(() => ({
+        currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
+        totalwaves: this.state && this.state.totalwaves,
+
+        controlIsLoading: false,
+        leaderboard: this.state && this.state.leaderboard,
+        modalAddress: undefined
+      }));
+
+    }
 
 
     this.submit = async () => {
@@ -428,30 +492,44 @@ class Showcase extends React.Component {
           const signer = provider.getSigner();
           const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
 
-          let count = await wavePortalContract.getTotalWaves();
-          console.log("Retrieved total wave count...", count.toNumber());
+          // let wavers = await wavePortalContract.getWavers();
+
+          //   console.log("###############WAV ERS");
+
+          //   wavers.map(async (myValue) => {
+
+          //     let waveInfo = await wavePortalContract.getWaverInfo(myValue);
+          //     await waveInfo.then(function (e) {
+          //       console.log("###############e");
+          //       console.log(e);
+          //     });
+
+          // });
+
+
+
           this.setState(() => ({
             currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
-            totalwaves: count.toNumber(),
+            totalwaves: this.state && this.state.totalwaves,
 
-            controlIsLoading: true
+            controlIsLoading: true,
+            leaderboard: this.state && this.state.leaderboard
           }));
           /*
           * Execute the actual wave from your smart contract
           */
-          const waveTxn = await wavePortalContract.wave();
+          const waveTxn = await wavePortalContract.submitImageUrl(this.state.puzzleImg.src);
           console.log("Mining...", waveTxn.hash);
 
           await waveTxn.wait();
           console.log("Mined -- ", waveTxn.hash);
 
-          count = await wavePortalContract.getTotalWaves();
-          console.log("Retrieved total wave count...", count.toNumber());
           this.setState(() => ({
             currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
-            totalwaves: count.toNumber(),
+            totalwaves: this.state && this.state.totalwaves,
 
-            controlIsLoading: false
+            controlIsLoading: false,
+            leaderboard: this.state && this.state.leaderboard
           }));
         } else {
           console.log("Ethereum object doesn't exist!");
@@ -462,7 +540,8 @@ class Showcase extends React.Component {
           currentAccount: this.state && this.state.currentAccount,       // update the value of specific key
           totalwaves: this.state && this.state.totalwaves,
 
-          controlIsLoading: false
+          controlIsLoading: false,
+          leaderboard: this.state && this.state.leaderboard
         }));
       }
     }
@@ -479,42 +558,67 @@ class Showcase extends React.Component {
       <section id="showcase" className="d-flex flex-column align-items-center showcase">
         <div id="overlay"></div>
         <div id="header" className="container m-auto text-primary text-center intro-text py-2">
-          <div className="flexbox default">
-            <div className="display-box">
-              <div className="bio">
+
+
+
+
+          {(this.state && this.state.isWinner) && (
+            <Button
+              id="event-cta"
+              className={"hero-icon rocket-flight " + "pink"}
+              onClick={this.submit}
+            >
+
+              <i className={"main fa fa-rocket"}></i>
+            </Button>)}
+
+          <CardColumns>
+            <canvas id="canvas"></canvas>
+            <div className="flexbox default puzzleintro">
+              <div className="display-box m-5">
                 I am Steve and did you know time is past?  You're welcome. Complete puzzles and join the leader board!
-              </div>
+
             </div>
-          </div>
-
-          <Button
-            id="event-cta"
-            className={"hero-icon coffee-cup " + "tan"}
-            onClick={this.wave}
-          >
-
-            <i className={"main fa fa-coffee"}></i>
-            <div className="cup-steam">
-              <i className="steam fa fa-fire"></i>
             </div>
-            <i className="steam fa fa-fire"></i>
-          </Button>
+            <Card color="light" className="text-dark">
+              <h2>Leader Board</h2>
+              <ListGroup>
+                {this.state && this.state.leaderboard && this.state.leaderboard.map((info) => (
+                  <ListGroupItem key={info.address} className="justify-content-between">{info.address}<Badge className="text-warning m-2" pill>{info.wins} WINS</Badge><Button id={info.address} className="btn btn-large m-2" onClick={this.OpenWinModal}>View</Button></ListGroupItem>
+                ))
+                }
 
-{(this.state && this.state.isWinner) && (
-          <Button
-            id="event-cta"
-            className={"hero-icon rocket-flight " + "pink"}
-            onClick={this.submit}
-          >
-
-            <i className={"main fa fa-rocket"}></i>
-          </Button>)}
-
-          <Card>
-            {(this.state && this.state.totalwaves) ? this.state.totalwaves : (<></>)}
-          </Card>
-          <canvas id="canvas"></canvas>
+              </ListGroup>
+            </Card>
+          </CardColumns>
         </div>
+
+        <Modal className="modal-lg " isOpen={this.state && this.state.modalAddress} toggle={this.CloseWinModal}>
+          <ModalHeader
+            toggle={this.CloseWinModal}>{this.state && this.state.modalAddress} Wins</ModalHeader>
+          <ModalBody>
+            {this.state && this.state.leaderboard && this.state.leaderboard.map((info) => {
+              if (this.state && info.address === this.state.modalAddress) {
+                return (
+                  <ListGroupItem key={info.address} className="justify-content-between">
+
+                    {info.imageUrls && info.imageUrls.map((src) => {
+
+                      return (
+
+                        <img src={src}></img>
+                      );
+
+                    })}
+
+                  </ListGroupItem>
+                );
+              }
+            })
+            }
+          </ModalBody>
+        </Modal>
+
         <Modal className="modal-lg " isOpen={this.state && this.state.controlIsLoading}>
           <ModalHeader>Please Wait</ModalHeader>
           <ModalBody>

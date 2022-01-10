@@ -47,3 +47,9 @@
     z-index: 2;
     background-color:whitesmoke;
   }
+
+  .puzzleintro
+  {
+    min-height: 400px;
+    max-height: 1400px;
+  }
