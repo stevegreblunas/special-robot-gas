@@ -7,7 +7,7 @@ import abi from './utils/WavePortal.json'
 /**
         * Create a letiable here that holds the contract address after you deploy!
         */
-const contractAddress = "0x5E5571618b77CE56C297115340801C3e26dFaEA4";
+const contractAddress = "0x21f6a943B2869745A1bd349d6821bd6B01B0F61a";
 
 let loaded = false;
 const contractABI = abi.abi;
@@ -315,6 +315,12 @@ class Showcase extends React.Component {
               }
             );
 
+            leaderboard.sort(function (a, b) {
+                    return a.wins - b.wins;
+                  });
+
+            leaderboard.reverse();
+            
             console.log(leaderboard);
 
             this.setState(() => ({
@@ -518,7 +524,7 @@ class Showcase extends React.Component {
           /*
           * Execute the actual wave from your smart contract
           */
-          const waveTxn = await wavePortalContract.submitImageUrl(this.state.puzzleImg.src);
+          const waveTxn = await wavePortalContract.submitImageUrl(this.state.puzzleImg.src, { gasLimit: 300000 });
           console.log("Mining...", waveTxn.hash);
 
           await waveTxn.wait();
